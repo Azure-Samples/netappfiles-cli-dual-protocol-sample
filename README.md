@@ -6,7 +6,7 @@ languages:
 products:
 - azure
 - azure-netapp-files
-description: "This project demonstrates how to create a dual-protocol Volume for Microsoft.NetApp resource provider using Azure CLI module.
+description: This project demonstrates how to create a dual-protocol Volume for Microsoft.NetApp resource provider using Azure CLI module.
 ---
 
 # Azure NetAppFiles script Sample - Dual-Protocol for Azure CLI 
@@ -16,13 +16,13 @@ This project demonstrates how to create a dual-protocol Volume (uses both SMB/NF
 In this sample application we perform the following operations:
 
 * Creations
-    * ANF Account
+    * Azure NetApp Files Account
     * Capacity Pool
     * Dual-Protocol Volume
 * Deletions
     * Dual-Protocol Volume
     * Capacity Pool
-    * ANF Account
+    * Azure NetApp Files Account
 
 >Note: The cleanup execution is disabled by default. If you want to run this end to end with the cleanup, please
 >change value of boolean variable 'SHOULD_CLEANUP' in create-anf-dual-protocol-volume.sh
