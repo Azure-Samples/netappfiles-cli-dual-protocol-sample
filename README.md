@@ -6,7 +6,7 @@ languages:
 products:
 - azure
 - azure-netapp-files
-description: This project demonstrates how to create a dual-protocol Volume for Microsoft.NetApp resource provider using Azure CLI module.
+description: This project demonstrates how to create a dual-protocol Volume for Microsoft.NetApp resource provider using CLI NetAppFiles module.
 ---
 
 # Azure NetAppFiles script Sample - Dual-Protocol for Azure CLI 
