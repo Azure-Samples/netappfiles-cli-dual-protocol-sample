@@ -16,8 +16,8 @@ SERVICE_LEVEL="Standard"
 NETAPP_VOLUME_SIZE_GIB=100
 
 # AD variables
-DOMAIN_JOIN_USERNAME="pmcadmin"
-DOMAIN_JOIN_PASSWORD="Password"
+DOMAIN_JOIN_USERNAME=""
+DOMAIN_JOIN_PASSWORD=""
 SMB_SERVER_NAME="pmcsmb"
 DNS_LIST="10.0.2.4,10.0.2.5"
 AD_FQDN="testdomain.local"
@@ -27,6 +27,38 @@ SHOULD_CLEANUP="true"
 
 # Exit error code
 ERR_ACCOUNT_NOT_FOUND=100
+
+usage()
+{
+    echo "Usage:"
+    echo "  $0 [OPTIONS]"
+    echo "    -u <DOMAIN_JOIN_USERNAME>                [Required]: DOMAIN_JOIN_USERNAME"
+    echo "    -p <DOMAIN_JOIN_PASSWORD>                [Required]: DOMAIN_JOIN_PASSWORD"
+    echo
+    echo "Example:"
+    echo # TODO: adjust example
+    echo "      $0 -u pmcadmin -p Password"
+    echo
+    echo
+}
+
+while getopts "u:p:" opt; do
+    case ${opt} in
+        u )
+            DOMAIN_JOIN_USERNAME=$OPTARG
+            ;;
+        p )
+            DOMAIN_JOIN_PASSWORD=$OPTARG
+            ;;
+        # Catch call, return usage and exit
+        h  ) usage; exit 0;;
+        \? ) echo "Unknown option: -$OPTARG" >&2; exit 1;;
+        :  ) echo "Missing option argument for -$OPTARG" >&2; exit 1;;
+        *  ) echo "Unimplemented option: -$OPTARG" >&2; exit 1;;
+    esac
+done
+if [ $OPTIND -eq 1 ]; then echo; echo "No options were passed"; echo; usage; exit 1; fi
+shift $((OPTIND -1))
 
 # Utils Functions
 display_bash_header()
@@ -133,7 +165,7 @@ get_resource_type()
     local _RESOURCE_ID=$1
     local __resultvar=$2    
     
-    _SPACED_RESOURCE_ID=$_RESOURCE_ID;_SPACED_RESOURCE_ID="${_RESOURCE_ID//\// }"   
+    _RESOURCE_ID="${_RESOURCE_ID//\// }"   
     OIFS=$IFS; IFS=' '; read -ra ANF_RESOURCES_ARRAY <<< $_SPACED_RESOURCE_ID; IFS=$OIFS
     
     if [[ "$__resultvar" ]]; then
@@ -152,28 +184,28 @@ wait_for_resource()
 {
     local _RESOURCE_ID=$1
 
-    _RESOURCE_TYPE="";get_resource_type $_RESOURCE_ID _RESOURCE_TYPE
+    local _RESOURCE_TYPE="";get_resource_type $_RESOURCE_ID _RESOURCE_TYPE
 
-    for number in {1..60}; do
+    for i in {1..60}; do
         sleep 10
         if [[ "${_RESOURCE_TYPE,,}" == "netappaccounts" ]]; then
-            _account_status=$(az netappfiles account show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            _ACCOUNT_STATUS=$(az netappfiles account show --ids $_RESOURCE_ID | jq -r ".provisioningState")
             if [[ "${_account_status,,}" == "succeeded" ]]; then
                 break
             fi        
         elif [[ "${_RESOURCE_TYPE,,}" == "capacitypools" ]]; then
-            _pool_status=$(az netappfiles pool show --ids $_RESOURCE_ID | jq -r ".provisioningState")
-            if [[ "${_pool_status,,}" == "succeeded" ]]; then
+            _POOL_STATUS=$(az netappfiles pool show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_POOL_STATUS,,}" == "succeeded" ]]; then
                 break
             fi                    
         elif [[ "${_RESOURCE_TYPE,,}" == "volumes" ]]; then
-            _volume_status=$(az netappfiles volume show --ids $_RESOURCE_ID | jq -r ".provisioningState")
-            if [[ "${_volume_status,,}" == "succeeded" ]]; then
+            _VOLUME_STATUS=$(az netappfiles volume show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_VOLUME_STATUS,,}" == "succeeded" ]]; then
                 break
             fi
         else
-            _snapshot_status=$(az netappfiles snapshot show --ids $_RESOURCE_ID | jq -r ".provisioningState")
-            if [[ "${_snapshot_status,,}" == "succeeded" ]]; then
+            _SNAPSHOT_STATUS=$(az netappfiles snapshot show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_SNAPSHOT_STATUS,,}" == "succeeded" ]]; then
                 break
             fi           
         fi        
@@ -185,34 +217,18 @@ wait_for_no_resource()
 {
     local _RESOURCE_ID=$1
 
-    _RESOURCE_TYPE="";get_resource_type $_RESOURCE_ID _RESOURCE_TYPE
+    local _RESOURCE_TYPE="";get_resource_type $_RESOURCE_ID _RESOURCE_TYPE
  
-    for number in {1..60}; do
+    for i in {1..60}; do
         sleep 10
         if [[ "${_RESOURCE_TYPE,,}" == "netappaccounts" ]]; then
-            {
-                az netappfiles account show --ids $_RESOURCE_ID
-            } || {
-                break
-            }                    
+            az netappfiles account show --ids $_RESOURCE_ID || break
         elif [[ "${_RESOURCE_TYPE,,}" == "capacitypools" ]]; then
-            {
-                az netappfiles pool show --ids $_RESOURCE_ID
-            } || {
-                break
-            }                   
+            az netappfiles pool show --ids $_RESOURCE_ID || break
         elif [[ "${_RESOURCE_TYPE,,}" == "volumes" ]]; then
-            {
-                az netappfiles volume show --ids $_RESOURCE_ID
-            } || {
-                break
-            }
+            az netappfiles volume show --ids $_RESOURCE_ID || break
         else
-            {
-                az netappfiles snapshot show --ids $_RESOURCE_ID
-            } || {
-                break
-            }         
+            az netappfiles snapshot show --ids $_RESOURCE_ID || break         
         fi        
     done   
 }
