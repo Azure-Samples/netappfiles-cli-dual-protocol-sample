@@ -3,7 +3,7 @@ set -euo pipefail
 
 # Mandatory variables for ANF resources
 # Change variables according to your environment 
-SUBSCRIPTION_ID="Subscription ID"
+SUBSCRIPTION_ID="<Subscription ID>"
 LOCATION="WestUS"
 RESOURCEGROUP_NAME="My-rg"
 VNET_NAME="testvnet"
@@ -15,13 +15,14 @@ NETAPP_VOLUME_NAME="netapptestvolume"
 SERVICE_LEVEL="Standard"
 NETAPP_VOLUME_SIZE_GIB=100
 
-#AD variables
+# AD variables
 DOMAIN_JOIN_USERNAME="pmcadmin"
 DOMAIN_JOIN_PASSWORD="Password"
 SMB_SERVER_NAME="pmcsmb"
 DNS_LIST="10.0.2.4,10.0.2.5"
 AD_FQDN="testdomain.local"
-#Cleanup Variable
+
+# Cleanup Variable
 SHOULD_CLEANUP="true"
 
 # Exit error code
@@ -48,10 +49,13 @@ display_message()
     message="$time : $1"
     echo $message
 }
-# ANF create functions
+
+#------------------
+# Create functions
+#-----------------
 
 # Create Azure NetApp Files Account
-create_or_update_netapp_account()
+create_netapp_account()
 {    
     local __resultvar=$1
     local _NEW_ACCOUNT_ID=""
@@ -77,7 +81,7 @@ create_or_update_netapp_account()
 
 
 # Create Azure NetApp Files Capacity Pool
-create_or_update_netapp_pool()
+create_netapp_pool()
 {
     local __resultvar=$1
     local _NEW_POOL_ID=""
@@ -98,7 +102,7 @@ create_or_update_netapp_pool()
 
 
 # Create Azure NetApp Files Volume
-create_or_update_netapp_volume()
+create_netapp_volume()
 {
     local __resultvar=$1
     local _NEW_VOLUME_ID=""
@@ -123,13 +127,105 @@ create_or_update_netapp_volume()
     fi      
 }
 
-# ANF cleanup functions
+# Return resource type from resource ID
+get_resource_type()
+{
+    local _RESOURCE_ID=$1
+    local __resultvar=$2    
+    
+    _SPACED_RESOURCE_ID=$_RESOURCE_ID;_SPACED_RESOURCE_ID="${_RESOURCE_ID//\// }"   
+    OIFS=$IFS; IFS=' '; read -ra ANF_RESOURCES_ARRAY <<< $_SPACED_RESOURCE_ID; IFS=$OIFS
+    
+    if [[ "$__resultvar" ]]; then
+        eval $__resultvar="'${ANF_RESOURCES_ARRAY[-2]}'"
+    else
+        echo "${ANF_RESOURCES_ARRAY[-2]}"
+    fi
+}
+
+#----------------------------
+# Waiting resources functions
+#----------------------------
+
+# Wait for resources to succeed 
+wait_for_resource()
+{
+    local _RESOURCE_ID=$1
+
+    _RESOURCE_TYPE="";get_resource_type $_RESOURCE_ID _RESOURCE_TYPE
+
+    for number in {1..60}; do
+        sleep 10
+        if [[ "${_RESOURCE_TYPE,,}" == "netappaccounts" ]]; then
+            _account_status=$(az netappfiles account show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_account_status,,}" == "succeeded" ]]; then
+                break
+            fi        
+        elif [[ "${_RESOURCE_TYPE,,}" == "capacitypools" ]]; then
+            _pool_status=$(az netappfiles pool show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_pool_status,,}" == "succeeded" ]]; then
+                break
+            fi                    
+        elif [[ "${_RESOURCE_TYPE,,}" == "volumes" ]]; then
+            _volume_status=$(az netappfiles volume show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_volume_status,,}" == "succeeded" ]]; then
+                break
+            fi
+        else
+            _snapshot_status=$(az netappfiles snapshot show --ids $_RESOURCE_ID | jq -r ".provisioningState")
+            if [[ "${_snapshot_status,,}" == "succeeded" ]]; then
+                break
+            fi           
+        fi        
+    done   
+}
+
+# Wait for resources to get fully deleted
+wait_for_no_resource()
+{
+    local _RESOURCE_ID=$1
+
+    _RESOURCE_TYPE="";get_resource_type $_RESOURCE_ID _RESOURCE_TYPE
+ 
+    for number in {1..60}; do
+        sleep 10
+        if [[ "${_RESOURCE_TYPE,,}" == "netappaccounts" ]]; then
+            {
+                az netappfiles account show --ids $_RESOURCE_ID
+            } || {
+                break
+            }                    
+        elif [[ "${_RESOURCE_TYPE,,}" == "capacitypools" ]]; then
+            {
+                az netappfiles pool show --ids $_RESOURCE_ID
+            } || {
+                break
+            }                   
+        elif [[ "${_RESOURCE_TYPE,,}" == "volumes" ]]; then
+            {
+                az netappfiles volume show --ids $_RESOURCE_ID
+            } || {
+                break
+            }
+        else
+            {
+                az netappfiles snapshot show --ids $_RESOURCE_ID
+            } || {
+                break
+            }         
+        fi        
+    done   
+}
+
+#------------------
+# Cleanup functions
+#------------------
 
 # Delete Azure NetApp Files Account
 delete_netapp_account()
 {
     az netappfiles account delete --resource-group $RESOURCEGROUP_NAME \
-        --name $NETAPP_ACCOUNT_NAME    
+        --name $NETAPP_ACCOUNT_NAME   
 }
 
 # Delete Azure NetApp Files Capacity Pool
@@ -137,8 +233,7 @@ delete_netapp_pool()
 {
     az netappfiles pool delete --resource-group $RESOURCEGROUP_NAME \
         --account-name $NETAPP_ACCOUNT_NAME \
-        --name $NETAPP_POOL_NAME
-    sleep 10    
+        --name $NETAPP_POOL_NAME      
 }
 
 # Delete Azure NetApp Files Volume
@@ -147,12 +242,11 @@ delete_netapp_volume()
     az netappfiles volume delete --resource-group $RESOURCEGROUP_NAME \
         --account-name $NETAPP_ACCOUNT_NAME \
         --pool-name $NETAPP_POOL_NAME \
-        --name $NETAPP_VOLUME_NAME
-    sleep 10
+        --name $NETAPP_VOLUME_NAME  
 }
 
-#Script Start
-#Display Header
+# Script Start
+# Display Header
 display_bash_header
 
 # Login and Authenticate to Azure
@@ -165,7 +259,8 @@ az account set --subscription $SUBSCRIPTION_ID
 
 display_message "Creating Azure NetApp Files Account ..."
 {    
-    NEW_ACCOUNT_ID="";create_or_update_netapp_account NEW_ACCOUNT_ID
+    NEW_ACCOUNT_ID="";create_netapp_account NEW_ACCOUNT_ID
+    wait_for_resource $NEW_ACCOUNT_ID
     display_message "Azure NetApp Files Account was created successfully: $NEW_ACCOUNT_ID"
 } || {
     display_message "Failed to create Azure NetApp Files Account"
@@ -174,7 +269,8 @@ display_message "Creating Azure NetApp Files Account ..."
 
 display_message "Creating Azure NetApp Files Pool ..."
 {
-    NEW_POOL_ID="";create_or_update_netapp_pool NEW_POOL_ID
+    NEW_POOL_ID="";create_netapp_pool NEW_POOL_ID
+    wait_for_resource $NEW_POOL_ID
     display_message "Azure NetApp Files pool was created successfully: $NEW_POOL_ID"
 } || {
     display_message "Failed to create Azure NetApp Files pool"
@@ -183,7 +279,8 @@ display_message "Creating Azure NetApp Files Pool ..."
 
 display_message "Creating Azure NetApp Files Volume..."
 {
-    NEW_VOLUME_ID="";create_or_update_netapp_volume NEW_VOLUME_ID
+    NEW_VOLUME_ID="";create_netapp_volume NEW_VOLUME_ID
+    wait_for_resource $NEW_VOLUME_ID
     display_message "Azure NetApp Files volume was created successfully: $NEW_VOLUME_ID"
 } || {
     display_message "Failed to create Azure NetApp Files volume"
@@ -192,30 +289,32 @@ display_message "Creating Azure NetApp Files Volume..."
 
 # Clean up resources
 if [[ "$SHOULD_CLEANUP" == true ]]; then
-    #Display cleanup header
+    # Display cleanup header
     display_cleanup_header
 
     # Delete Volume
     display_message "Deleting Azure NetApp Files Volume..."
     {
         delete_netapp_volume
+        wait_for_no_resource $NEW_VOLUME_ID
         display_message "Azure NetApp Files volume was deleted successfully"
     } || {
         display_message "Failed to delete Azure NetApp Files volume"
         exit 1
     }
 
-    #Delete Capacity Pool
+    # Delete Capacity Pool
     display_message "Deleting Azure NetApp Files Pool ..."
     {
         delete_netapp_pool
+        wait_for_no_resource $NEW_POOL_ID
         display_message "Azure NetApp Files pool was deleted successfully"
     } || {
         display_message "Failed to delete Azure NetApp Files pool"
         exit 1
     }
 
-    #Delete Account
+    # Delete Account
     display_message "Deleting Azure NetApp Files Account ..."
     {
         delete_netapp_account

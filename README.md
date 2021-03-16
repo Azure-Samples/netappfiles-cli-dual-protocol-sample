@@ -6,7 +6,7 @@ languages:
 products:
 - azure
 - azure-netapp-files
-description: "This project demonstrates how to create a dual-protocol Volume for Microsoft.NetApp resource provider using Azure CLI module.
+description: This project demonstrates how to create a dual-protocol Volume for Microsoft.NetApp resource provider using Azure CLI NetAppFiles module.
 ---
 
 # Azure NetAppFiles script Sample - Dual-Protocol for Azure CLI 
@@ -16,13 +16,13 @@ This project demonstrates how to create a dual-protocol Volume (uses both SMB/NF
 In this sample application we perform the following operations:
 
 * Creations
-    * ANF Account
+    * Azure NetApp Files Account
     * Capacity Pool
     * Dual-Protocol Volume
 * Deletions
     * Dual-Protocol Volume
     * Capacity Pool
-    * ANF Account
+    * Azure NetApp Files Account
 
 >Note: The cleanup execution is disabled by default. If you want to run this end to end with the cleanup, please
 >change value of boolean variable 'SHOULD_CLEANUP' in create-anf-dual-protocol-volume.sh
@@ -39,7 +39,7 @@ If you don't already have a Microsoft Azure subscription, you can get a FREE tri
 1. Windows with WSL enabled (Windows Subsystem for Linux) or Linux to run the script. This was developed/tested on Ubuntu 18.04 LTS (bash version 4.4.20).
 1. Make sure [jq](https://stedolan.github.io/jq/) package is installed before executing this script.
 
-# What is netappfiles-cli-pool-change-sample doing? 
+# What is netappfiles-cli-dual-protocol-sample doing? 
 
 This sample is dedicated to demonstrate how to create a dual-protocol Volume using an ANF Account name in Azure NetApp Files.
 Dual-protocol volumes use both SMB and NFS protocol types.
